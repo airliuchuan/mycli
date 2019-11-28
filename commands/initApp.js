@@ -44,6 +44,34 @@ const initApp = async (name) => {
       spinner.succeed('模板下载成功');
       spinner.stop();
       return setPackageJson(createDir, name);
+    })
+    .then(() => {
+      spinner.succeed('package.json配置成功');
+      return isNeedNpmInstall();
+    })
+    .then(isNeed => {
+      spinner.text = '正在下载依赖';
+      spinner.start();
+      if (isNeed) {
+        return npmInstall(createDir);
+      } else {
+        return '创建完成'
+      }
+    })
+    .then(flag => {
+      if (flag) {
+        spinner.succeed(flag);
+        logInfo(`输入命令： cd ${createDir} && npm install && npm run serve`);
+        logInfo('就可以启动新项目了');
+      } else {  
+        spinner.succeed('初始化项目完成');
+        spinner.stop();
+      }
+    })
+    .catch(e => {
+      logWarning(e.msg);
+      logWarning(`问题：${e.stack}`)
+      process.exit(1);
     });
   } catch(e) {
     logWarning('创建终止');
@@ -80,9 +108,39 @@ function setPackageJson(dir, name) {
       }
     ]).then(answer => {
       let mergePkg = Object.assign(pkg, answer);
-      console.log(mergePkg);
       fs.writeFileSync(pkgPath, JSON.stringify(mergePkg, null, ' '));
+      resolve();
     });
+  });
+}
+// 询问是否需要安装依赖
+function isNeedNpmInstall() {
+  return new Promise((resolve, reject) => {
+    inquirer.prompt([
+      {
+        type: 'confirm',
+        name: 'isNeed',
+        message: '是否需要安装npm依赖',
+        default: true
+      }
+    ]).then(answer => {
+      resolve(answer.isNeed);
+    });
+  });
+}
+
+function npmInstall(dir) {
+  return new Promise(async (resolve, reject) => {
+    let cmd = `cd ${dir} && npm install`;
+    let {err, stderr} = await exec(cmd);
+    if (err) {
+      reject({
+        msg: '依赖下载失败',
+        stack: stderr
+      })
+    } else {
+      resolve();
+    }
   });
 }
 
